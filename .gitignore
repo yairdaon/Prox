@@ -1,6 +1,13 @@
 *.png
-*.tex
 *.pyc
 *.bbl
 *.bib
+*~
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.aux
+chambolle.pdf
+MM.pdf
 test_*.png
