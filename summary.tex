@@ -41,13 +41,16 @@
 %----------------------------------------------------------------------------------------
 % new commands
 %----------------------------------------------------------------------------------------
-\newcommand{\der}{\text{d}}
+\newcommand{\data}{\mathbf{d}}
 \newcommand{\coder}[1]{\texttt{#1}}
 \newcommand{\inner}[2]{#1 \cdot #2}
 \newcommand{\prox}{\text{Prox}}
 \newcommand{\grad}{\nabla_{d} }
 \newcommand{\modd}{\text{ mod }}
 \newcommand{\divg}{\text{div}}
+\newcommand{\fft}{\text{FFT}}
+\newcommand{\ifft}{\text{i}\fft}
+
 \title{Proximal Methods for Image Deblurring}
 
 \author{Yair Daon}
@@ -143,8 +146,8 @@ We calculate the normalization constant. Explanations follow.
   &= \left (2\pi \left (-\frac{r}{\alpha}\exp(-\alpha r) \big
   |_{r=0}^{r=\infty} +\frac{1}{\alpha} \int_0^{\infty}\exp(-\alpha
   r) dr \right ) \right)^{N^2}\\
-  &= (\frac{2\pi}{\alpha^2})^{N^2} \\
-  & \approx C \alpha^{-\eta N^2}.
+  &= \left (\frac{2\pi}{\alpha^2} \right )^{N^2} \\
+  & = C \alpha^{-\eta N^2}.
 \end{align*} 
 
 The first approximation builds on an assumption from
@@ -157,19 +160,21 @@ specifically) and \cite{green2015bayesian} uses $\eta = 1$ and this is
 the value used here. Then:
 
 \begin{align*}
- \pi (\theta) &\approx \frac{1}{C} \int_{0}^{\infty} \alpha^{N^2 } \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
- &= \frac{1}{C} \int_{0}^{\infty} \alpha^{N^2} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
- %
- %
- &= \frac{1}{C} \left (
- \frac{-\alpha^{N^2} \exp(-\alpha (\|\grad\theta\|_2 + 1)}{||\grad\theta||_2 + 1} \bigg |_{\alpha=0}^{\alpha=\infty}
- +\frac{N^2}{\|\grad\theta\|_2 + 1}\int_{0}^{\infty} \alpha^{N^2-1} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \right ) \\
- %
- %
- &= \frac{N^2}{C\|\grad\theta\|_2 + 1}\int_{0}^{\infty} \alpha^{N^2-1} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
- %
- &= \frac{ N^2!}{ C(\|\grad\theta\|_1 + 1)^{N^2+1}} \text{ (repeated integration by parts)}\\
- &\propto (\|\grad\theta\|_2 + 1)^{-N^2-1},
+  \pi (\theta) &\approx \frac{1}{C} \int_{0}^{\infty} \alpha^{N^2 } \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
+  %
+  %
+  %% &= \frac{1}{C} \int_{0}^{\infty} \alpha^{N^2} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
+  %
+  %
+  &= \frac{1}{C} \left (
+  \frac{-\alpha^{N^2} \exp(-\alpha (\|\grad\theta\|_2 + 1))}{||\grad\theta||_2 + 1} \bigg |_{\alpha=0}^{\alpha=\infty}
+  +\frac{N^2}{\|\grad\theta\|_2 + 1}\int_{0}^{\infty} \alpha^{N^2-1} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \right ) \\
+  %
+  %
+  &= \frac{N^2}{C\|\grad\theta\|_2 + 1}\int_{0}^{\infty} \alpha^{N^2-1} \exp( -\alpha (\|\grad\theta\|_2 + 1)) d\alpha \\
+  %
+  &= \frac{ N^2!}{ C(\|\grad\theta\|_1 + 1)^{N^2+1}} \text{ (repeated integration by parts)}\\
+  &\propto (\|\grad\theta\|_2 + 1)^{-N^2-1},
 \end{align*}
 
 which is equation (24) from \cite{oliveira2009adaptive} (with $\alpha
@@ -181,7 +186,7 @@ posterior is:
   &\propto \exp \left ( -\frac{1}{2\sigma^2} \|H\theta - y\|_2^2 - (N^2 + 1) \log (\|\grad\theta\|_2 + 1) \right ) \\
 \end{align*}
  
-and so 
+and so we seek
 
 \begin{equation*}
 \theta_{\text{MAP}} = \argmin_{\theta} \frac{1}{2\sigma^2} \|H\theta - y\|_2^2 + (N^2 + 1) \log (\|\grad\theta\|_2 + 1),
@@ -191,14 +196,17 @@ which is the maximization problem (21) from \cite{green2015bayesian}
 except that we use the 2-norm and not the composite 1,2-norm and our
 $N^2$ is denoted there by $n$.
 
-\subsection{Convex Majorants}
+\subsection{Convex Majorants}\label{subsec:MM}
 
-The above minimization problem is not convex - for once, log is concave.
-This is circumvented in \cite{oliveira2009adaptive} by taking a sequence of convex majorants. 
-Consider the problem of finding $\hat{\theta} \in \argmin_{x} L(\theta)$, for some $L$. Carrying out the majorization-minimization 
-approach consists of finding a bound $Q(\theta; \theta') \geq L(\theta), \forall \theta,\theta'$
-with equality for $\theta=\theta'$
-and then iterating $\theta^{(t+1)} := \argmin_{\theta} Q(\theta;\theta^{(t)})$. This iteration is monotone:
+The above minimization problem is not convex --- for once, log is
+concave.  This is circumvented in \cite{oliveira2009adaptive} by
+taking a sequence of convex majorants.  Consider the problem of
+finding $\hat{\theta} \in \argmin_{x} L(\theta)$, for some
+$L$. Carrying out the majorization-minimization approach consists of
+finding a bound $Q(\theta; \theta') \geq L(\theta), \forall
+\theta,\theta'$ with equality for $\theta=\theta'$ and then iterating
+$\theta^{(t+1)} := \argmin_{\theta} Q(\theta;\theta^{(t)})$. This
+iteration is monotone:
 \begin{align*}
   L(\theta^{(t+1)}) &= L(\theta^{(t+1)}) - Q(\theta^{(t+1)}; \theta^{(t)}) + Q(\theta^{(t+1)}; \theta^{(t)})\\
   %
@@ -256,35 +264,31 @@ minimizer. This is the problem that (should be) denoted by (22) in
 \cite{green2015bayesian} (one of the authors made a typo and uses a
 different $\alpha^{(t)}$. I confirmed this with the author).
 
-Now that we have a convex optimization problem, we'd like to use Douglas Rachford. 
-Define
-\begin{align*}
-  g(\theta) &:=  \frac{1}{2\sigma^2} \|H\theta - y\|_2^2 \\
-  h(\theta) &:= \alpha^{(t)} \|\grad \theta\|_2. \\
-\end{align*}
+We would like to use the forward backward algorithm
+\cite{combettes2011splitting} to minimize $Q$. Anticipating this, we
+calculate proximal maps and gradients in the following sections.
 
-We need to find the proximal maps.
-
-
-\section{Calculating $\prox_h$}
-This section follows \cite{chambolle2004algorithm}. Let $J(\theta) := \|\grad \theta \|_2 = \sum_{i,j} |(\grad \theta_{ij})|$.
-Note that $J(\lambda \theta) = \lambda J(\theta)$ for $\lambda \geq 0$ and also $J \geq 0$. If $\exists \theta_0$ s.t.
-$\langle \phi,\theta_0 \rangle - J(\theta_0) > 0$,
-then $\langle \lambda\theta_0, \phi \rangle - J(\lambda \theta_0) \to \infty$ as $\lambda \to \infty$. Thus we may easily conclude,
+\section{Chambolle's Algorithm}
+In this section I follow \cite{chambolle2004algorithm}. Let $J(u) :=
+\|\grad u \|_2 = \sum_{i,j} |(\grad u_{ij})|$.  Note that $J(\lambda
+u) = \lambda J(u)$ for $\lambda \geq 0$ and also $J \geq 0$. If
+$\exists u_0$ s.t.  $\langle v, u_0 \rangle - J(u_0) > 0$, then
+$\langle \lambda u_0, v \rangle - J(\lambda u_0) \to \infty$ as
+$\lambda \to \infty$. Thus we may easily conclude,
 
 \begin{align*}
-  J^{*}(\phi) :&= \sup_{\theta} \langle \phi, \theta \rangle - J(\theta) \\
+  J^{*}(v) :&= \sup_{u} \langle v, u \rangle - J(u) \\
   %
   %
   % 
-  &= \sup_{\theta} \sum_{i,j = 1}^{N} \phi_{ij} \theta_{ij} - J( \theta ) \\ 
+  &= \sup_{u} \sum_{i,j = 1}^{N} v_{ij} u_{ij} - J( u ) \\ 
   %
   %
   %
   &= 
   \begin{cases}
-    0 & \phi \in K\\
-    \infty & \phi \not \in K.\\ 
+    0 & v \in K\\
+    \infty & v \not \in K.\\ 
   \end{cases}
 \end{align*}
  
@@ -292,25 +296,25 @@ $K$ is convex since $J^{*}$ is. Since $J$ is convex lsc, we observe
 that
 
 \begin{align*}
-  J(\theta) &= J^{**}(\theta) \\ 
-  &= \sup_{\phi} \langle \phi, \theta \rangle - J^{*}(\phi) \\
+  J(u) &= J^{**}(u) \\ 
+  &= \sup_{v} \langle v, u \rangle - J^{*}(v) \\
   %
   %
   %
-  &= \sup_{\phi\in K} \langle \phi, \theta \rangle
+  &= \sup_{v\in K} \langle v, u \rangle
 \end{align*}
 
 By Cauchy Schwarz (and its equality condition)   
 \begin{align*}
-  J(\theta) &= \sum_{ij} | \grad \theta | \\ 
-  &= \sup_{|p_{ij}| \leq 1} \sum_{ij} (\grad\theta)^1_{ij} p^{1}_{ij} + (\grad\theta)^2_{ij} p^{2}_{ij} \\
+  J(u) &= \sum_{ij} | \grad u | \\ 
+  &= \sup_{|p_{ij}| \leq 1} \sum_{ij} (\grad u)^1_{ij} p^{1}_{ij} + (\grad u)^2_{ij} p^{2}_{ij} \\
   %
   %
   %
-  &= \sup_{|p_{ij}| \leq 1} \langle \grad\theta, p  \rangle \\
+  &= \sup_{|p_{ij}| \leq 1} \langle \grad u, p  \rangle \\
   %
   %
-  &= \sup_{|p_{ij}| \leq 1} \langle \theta, \grad^{*} p  \rangle \\
+  &= \sup_{|p_{ij}| \leq 1} \langle u, \grad^{*} p  \rangle \\
 \end{align*}
 
 with the obvious definition of an inner product. If we denote $ \divg
@@ -322,46 +326,66 @@ boundary. We may now turn to deriving an algorithm for the proximity
 mapping.
 
 \begin{align*}
-  p &= \prox_{\lambda J}(\theta) \\ 
+  u :&= \prox_{\lambda J}(\data) \\
   %
-  % 
-  % 
-  &= \argmin_{x} \frac{1}{2}\| x- \theta \|^2 + \lambda J(x) \\
-  % 
-  % 
-  % 
-  \Leftrightarrow 0 &\in \frac{p - \theta}{\lambda} + \partial J(p) \\
+  %
+  %
+  &= \argmin_{u} \frac{1}{2}\| u - \data \|^2 + \lambda J(u) \\
   % 
   % 
   % 
-  \Leftrightarrow \frac{\theta - p}{\lambda} &\in \partial J(p) \\
+  \Leftrightarrow 0 &\in \frac{u - \data}{\lambda} + \partial J(u) \\
   % 
   % 
   % 
-  \Leftrightarrow p &\in \partial J^{*}( \frac{\theta - p}{\lambda}) \\
+  \Leftrightarrow \frac{\data - u}{\lambda} &\in \partial J(u) \\
+  % 
+  % 
+  % 
+  \Leftrightarrow u &\in \partial J^{*}\left ( \frac{\data - u}{\lambda}\right ) \\
   % 
   % 
   % 
   \Leftrightarrow 0
-  &\in \frac{\theta - p}{\lambda} - \frac{\theta}{\lambda} + \frac{1}{\lambda} \partial J^{*}( \frac{\theta - p}{\lambda}).
+  &\in \frac{\data - u}{\lambda} - \frac{\data}{\lambda} + \frac{1}{\lambda} \partial J^{*}\left ( \frac{\data - u}{\lambda} \right ).
 \end{align*}
 
-Denote $w: = \frac{\theta - p }{\lambda}$. We conclude that $w$
-minimizes $\frac{1}{2}\| w - \frac{\theta}{\lambda}\|^2 +
+Denote $w: = \frac{\data - u}{\lambda}$. We conclude that $w$
+minimizes $\frac{1}{2}\| w - \frac{\data}{\lambda}\|^2 +
 \frac{1}{\lambda}J^{*}(w)$.  Since $J^{*}$ is the characteristic
-function of $K$, we deduce $w = P_{K}( \frac{\theta}{\lambda} )$.
-Recalling $p = \prox_{\lambda J}(\theta)$ and rearranging:
+function of $K$, we deduce $\frac{\data-u}{\lambda} = w = P_{K}( \frac{\data}{\lambda} )$.
+Recalling $u= \prox_{\lambda J}(\data)$ and rearranging:
 
-\begin{equation*}
-  \prox_{\lambda J}(\theta) = \theta - P_{\lambda K}( \theta ).
+\begin{equation*}%%\label{eq:chambolle prox}
+  \prox_{\lambda J}(\data) = \data -  \lambda P_{K}\left ( \frac{\data}{\lambda} \right ).
 \end{equation*}
+
+So
+
+\begin{equation}\label{eq:chambolle prox}
+  \prox_{\lambda J}(\data) = \data - P_{\lambda K} ( \data ).
+\end{equation}
+
+%% Since
+
+%% \begin{eqnarray*}
+%%     \lambda P_K\left (\frac{\data}{\lambda} \right ) &= \lambda \argmin_{x \in K} \|x-\frac{\data}{\lambda}\| \\
+%%     %
+%%     %
+%%     %
+%%     &= \lambda \argmin_{x/\lambda \in K} \|\frac{x-\data}{\lambda} \| \\
+%%     %
+%%     %
+%%     %
+%%     &= \lambda \argmin_{x \in \lambda K} \| x - \data \| \\
+%% \end{eqnarray*}
 
 Finding the projection amounts to finding the minimizer
 
 \begin{equation*}
-P_{\lambda K}(\theta) = \argmin_{|p_{ij}| - 1 \leq 0} \|\lambda \divg
-p - \theta \|^2 = \argmin_{|p_{ij}| - 1 \leq 0} \| \divg p -
-\frac{\theta}{\lambda} \|^2 / 2.
+  P_{\lambda K}(\data) = \argmin_{|p_{ij}| - 1 \leq 0} \| \lambda \divg
+  p - \data \|^2 = \argmin_{|p_{ij}| - 1 \leq 0} \| \divg p -
+  \frac{\data}{\lambda} \|^2.
 \end{equation*}
 
 Now recall that $\nabla \|Ax - b \|^2/2 = A^*(Ax-b)$ and that $\divg =
@@ -372,7 +396,7 @@ inequality constraint $|p_{ij}| - 1 \leq 0$. For these and for a
 minimum, it holds that $\forall i,j$:
 
 \begin{align*}
-  -\grad( \divg p - \frac{\theta}{\lambda} )_{ij} +  \mu_{ij} p_{ij} &= 0 \\
+  -\grad \left ( \divg p - \frac{\data}{\lambda} \right )_{ij} +  \mu_{ij} p_{ij} &= 0 \\
   %
   %
   %
@@ -387,54 +411,74 @@ minimum, it holds that $\forall i,j$:
   \mu_{ij}( |p_{ij}|^2 - 1 ) &= 0.
 \end{align*}
 
-Thus, if $\mu_{ij} = 0$ then also $-\grad(  \divg p -\frac{\theta}{\lambda} )_{ij} = 0$.
-If $\mu_{ij} > 0$ then $|p_{ij}| = 1$ and so $|\grad( \divg p - \frac{\theta}{\lambda} )_{ij}| = \mu_{ij}$.
+Thus, if $\mu_{ij} = 0$ then also $-\grad(  \divg p -\frac{\data}{\lambda} )_{ij} = 0$.
+If $\mu_{ij} > 0$ then $|p_{ij}| = 1$ and so $|\grad( \divg p - \frac{\data}{\lambda} )_{ij}| = \mu_{ij}$.
 Consequently,
 
 \begin{equation*}
-  |\grad(\divg p - \frac{\theta}{\lambda} )_{ij}| =  \mu_{ij}, \ \forall i,j.
+ \left |\grad \left (\divg p - \frac{\data}{\lambda} \right )_{ij} \right | =  \mu_{ij}, \ \forall i,j.
 \end{equation*}
 
 Then a minimum will satisfy
 
 \begin{equation*}
-  \grad( \divg p - \frac{\theta}{\lambda} )_{ij} = |\grad( \divg p - \frac{\theta}{\lambda} )_{ij}|  p_{ij}.
+  \grad \left ( \divg p - \frac{\data}{\lambda} \right )_{ij} = \left
+  |\grad \left ( \divg p - \frac{\data}{\lambda} \right )_{ij} \right
+  | p_{ij}.
 \end{equation*}
 
 Let $\tau > 0$. The following iteration is reasonable at least because
 the minimum is a fixed point.
 \begin{equation}
-  p_{ij}^{n+1} = p_{ij}^{n} + \tau \left ( \grad (\divg p^{n} -
-    \frac{\theta}{\lambda})_{ij} - | \grad (\divg p^{n} -
-    \frac{\theta}{\lambda})_{ij}|p_{ij}^{n+1} \right ),
+  p_{ij}^{n+1} = p_{ij}^{n} + \tau \left ( \grad \left (\divg p^{n} -
+    \frac{\data}{\lambda} \right )_{ij} - \left | \grad \left (\divg p^{n} -
+    \frac{\data}{\lambda} \right )_{ij} \right | p_{ij}^{n+1} \right ),
 \end{equation}
 
 which is equivalent to:
 
 \begin{equation}
-p_{ij}^{n+1} = \frac{p_{ij}^{n} + \tau \grad (\divg p^{n} - \frac{\theta}{\lambda})_{ij}}
-{1+ \tau | \grad (\divg p^{n} - \frac{\theta}{\lambda})_{ij}|}.
+p_{ij}^{n+1} = \frac{p_{ij}^{n} + \tau \grad \left (\divg p^{n} - \frac{\data}{\lambda} \right )_{ij}}
+{1+ \tau \left | \grad \left ( \divg p^{n} - \frac{\data}{\lambda}\right )_{ij}  \right | }.
 \end{equation}
 
-Chambolle \cite{chambolle2004algorithm} proves this converges for $0 <
-\tau \leq \frac{1}{8}$ and states that $\tau = \frac{1}{4}$ is
-optimal.
+Chambolle \cite[Theorem 3.1]{chambolle2004algorithm} proves $\lim_{n \to \infty} \lambda
+\divg p^n = P_{\lambda K}(\data)$ for $0 < \tau \leq \frac{1}{8}$ and
+states that $\tau = \frac{1}{4}$ is optimal.
 
-\subsection{Results for Chambolle's algorithm}
-The proposed algorithm runs extremely fast, see resulsts in figure
-\ref{cham}.
+Hence, calculating $\prox_{\lambda J}(\data)$ is straightforward:
 
-\begin{figure}[ht!]
-\centering
-\includegraphics[width=150mm]{test_cham.png}
-\caption{Performance of Chambolle's algorithm. Noise amplitude is $\sigma = 15$. \label{cham}}
-\end{figure}
+\begin{algorithm}
+  \caption{Chambolle's Algorithm for $\prox_{\lambda J}(\data)$}\label{alg:chambolle}
+  \begin{algorithmic}
+    \Function{Chambolle}{$\data, \lambda$}
+    \State $p \gets \data$
+    \For {$n = 1,2,3,...$}
+
+    \State $\forall i,j:\ \hat{p}_{ij} \gets \frac{p_{ij} + \tau \grad (\divg p - \frac{\data}{\lambda})_{ij}}
+    {1+ \tau | \grad (\divg p - \frac{\data}{\lambda})_{ij}|}$
+    \State $p \gets \hat{p}$
+    \EndFor
+    \Return $\data - \lambda \divg p$
+  \end{algorithmic}
+\end{algorithm}
+
+
+%% \subsection{Results for Chambolle's algorithm}
+%% The proposed algorithm runs extremely fast, see resulsts in figure
+%% \ref{cham}.
+
+%% \begin{figure}[ht!]
+%% \centering
+%% \includegraphics[width=150mm]{test_cham.png}
+%% \caption{Performance of Chambolle's algorithm. Noise amplitude is $\sigma = 15$. \label{cham}}
+%% \end{figure}
 
 
 
-\section{Calculating $\grad g$}
-Lets do a calculation. In this section we define, for our kernel 
- $\bar{K}_{i-m,j-n} =  K_{m-i,n-j}, \ \forall m,n$.
+\section{The Gradient}
+Lets do a calculation. In this section we define, for our kernel
+$\bar{K}_{i-m,j-n} = K_{m-i,n-j}, \ \forall m,n$.
 
 \begin{align*}
   \langle Hu,v \rangle &= \langle K * u, v \rangle\\
@@ -484,20 +528,34 @@ K_{N-i,N-j}$. Recalling that $K_{ij} := \frac{1}{ (2m+1)^2 }
   &= \frac{1}{ (2m+1)^2 } \mathbf{1}_{\{ N-2m \leq i,j \leq N \} } \\
 \end{align*}
 
-We may concolude that the gradient $\grad$ (wrt to each pixel, not
+We may concolude that the gradient $\nabla$ (wrt to each pixel, not
 the discrete gradient) is:
 
 \begin{align*}
-  \grad \frac{1}{2\sigma^2} \|Hu - y\|^2 &= \frac{1}{\sigma^2} H^{*}(Hu -y ) \\
-  &= \frac{1}{\sigma^2} \bar{K} * (K*u - y)\\
-  &= \frac{1}{\sigma^2} K * (K*u - y),\\
+  \nabla \frac{1}{2\sigma^2} \|Hu - \data \|^2 &= \frac{1}{\sigma^2} H^{*}(Hu - \data ) \\
+  &= \frac{1}{\sigma^2} \bar{K} * (K*u - \data )\\
+  &= \frac{1}{\sigma^2} K * (K*u - \data),\\
 \end{align*}
-which can be very easily implemented using FFT. If we want to use
-forward-backward, we must estimate the Lipschitz constant of the
-gradient:
+which can be very easily implemented using FFT.
+
+
+\begin{algorithm}
+  \caption{$\nabla \frac{1}{2\sigma^2} \|Hu - \data\|^2$}
+  \begin{algorithmic}
+    \Function{Gradient}{$\data$}
+    \State $\hat K \gets \fft(K)$
+    \State $\hat u \gets \fft\{u\}$
+    \State $t \gets \ifft \{ \hat{K} \hat{u}\}$
+    \State \Return $\sigma^{-2}\ifft \{ \hat{K}(t - \data ) \}$
+  \end{algorithmic}
+\end{algorithm}
+
+
+If we want to use forward-backward, we must estimate the Lipschitz
+constant of the gradient:
 
 \begin{align*}
-  \|\grad g(u) - \grad g(v)\| &= \|\frac{1}{\sigma^2} H^{*}(Hu - y ) - \frac{1}{\sigma^2}H^{*}(Hv - y)\| \\
+  \|\nabla g(u) - \nabla g(v)\| &= \|\frac{1}{\sigma^2} H^{*}(Hu - \data ) - \frac{1}{\sigma^2}H^{*}(Hv - \data)\| \\
   %
   %
   %
@@ -509,15 +567,15 @@ gradient:
   % 
   % 
   %  
-  &= \frac{1}{\sigma^2} [\sup_{\|w\| = 1} \|Hw\|]^2 \|u-v\| \\
+  &= \frac{1}{\sigma^2} \left ( \sup_{\|w\| = 1} \|Hw\| \right )^2 \|u-v\| \\
   %
   % 
   %
-  &= \frac{1}{\sigma^2} [\sup_{\|\hat{w}\| = 1} \|\hat{K} \cdot \hat{w}\|]^2 \|u-v\| \text{ (FT) }\\
+  &= \frac{1}{\sigma^2} \left ( \sup_{\|\hat{w}\| = 1} \|\hat{K} \cdot \hat{w}\| \right )^2 \|u-v\| \text{ (FT) }\\
   %
   %
   %
-  &= \frac{1}{\sigma^2} [\sup_{\|\hat{w}\| = 1} |\langle \hat{K},  \hat{w}\rangle|]^2 \|u-v\| \\
+  &= \frac{1}{\sigma^2} \left ( \sup_{\|\hat{w}\| = 1} |\langle \hat{K},  \hat{w}\rangle| \right )^2 \|u-v\| \\
   %
   %
   &\leq \frac{1}{\sigma^2} \|\hat{K}\|^2 \|u-v\| \text{ (CS) }\\
@@ -532,25 +590,41 @@ gradient:
   &= \frac{1}{\sigma^2} \|u-v\|.
 \end{align*}
 
-And so, in forward-backward terminology, $\beta = \sigma^2$. We will
-thus take $\gamma :=\beta = \sigma^2$.  We see that $\delta := \min
-\{1, \beta / \gamma \} + \frac{1}{2} = \frac{3}{2}$. Thus we may take
-$\lambda_n \equiv 1$.
+Thus, the Lipschitz constant of the gradient is $\sigma^{-2}$.
 
+\section{The forward backward algorithm}
 
+I used a simplified version of the Forward-Backward algorithm
+\cite[algorithm 3.4]{combettes2011proximal}. Let me outline the
+notation and algorithm used there. We are given $f_1$ convex lower
+semi continuous and $f_2$ convex and differentiable with Lipschitz
+constant $\beta$. We seek $\argmin f_1 + f_2$ and have access to
+$\nabla f_2$ and $\prox_{\lambda f_1}$, for any $\lambda > 0$.
 
-\section{Putting the pieces together}
-I used Forward Backward to find $\theta^{(t+1)}$ in every step. Here
-is the algorithm I implement. Recall that
-\begin{align*}
-  g(\theta)         &=  \frac{1}{2\sigma^2} \|H\theta - y\|_2^2, \\
-  \gamma  h(\theta) &= \sigma^2 \alpha^{(t)} \|\grad \theta\|_2, \\
-  \alpha^{(t)}       &= (N^2+1)( \|\grad\theta^{(t)} \|_2 + 1 )^{-1}. \\
-\end{align*}
-
-I took, as noted above, $\gamma = \sigma^2, \lambda_{n} \equiv 1$ in the forward backward algorithm. 
 \begin{algorithm}
-  \label{fwdbckwd}
+  \caption{Forward Backward algorithm\label{forward backward}}
+  \begin{algorithmic}
+    \State Fix $\epsilon \in (0,3/4)$ and an arbitrary $x_0$.
+    \For {$n = 1,2,3,...$}
+    \State $y_n \gets x_n - \beta^{-1}\nabla f_2(x_n)$
+    %% \State $\lambda_n \in [\epsilon, 3/2 - \epsilon]$
+    %% \State $x_n \gets x_n +\lambda_n ( \prox_{\beta^{-1}f_1} y_n  - x_n)$
+    \State $x_n \gets \prox_{\beta^{-1}f_1} y_n$
+  \end{algorithmic}
+\end{algorithm}
+
+In algorithm \ref{forward backward} I take $\lambda_n \equiv 1$ for
+simplicity of implementation and exposition (read: laziness). Given
+
+%% \begin{align*}
+%%   g(u;y) &= \frac{1}{2\sigma^2} \|Hu - y\|_2^2, \\
+%%   \nabla g(u;y) & = \sigma^{-2} K * (Ku - y), \\
+%%   \text{Lip}\nabla g &= \sigma^{-2}, \\
+%%   h(\theta) &= \alpha^{(t)} \|\grad \theta \|_2, \\
+%%   \alpha^{(t)} &= (N^2+1)( \|\grad\theta^{(t)} \|_2 + 1 )^{-1}.
+%%   \end{align*}
+
+\begin{algorithm}
   \caption{MM and FwdBckwd}
   \begin{algorithmic}[1]
     \State Set $\theta \gets y$ \Comment{The corrupted image.}    
@@ -569,9 +643,9 @@ I took, as noted above, $\gamma = \sigma^2, \lambda_{n} \equiv 1$ in the forward
 
     \For {$i,j=1,...,N$}
 
-    \State $z_{ij}^{tmp} \gets \frac{z_{ij} + \tau \grad (\divg
-      z - \frac{\theta}{\lambda})_{ij}} {1+ \tau | \grad (\divg
-      z - \frac{\theta}{\lambda})_{ij}|}$
+    \State $z_{ij}^{tmp} \gets \frac{z_{ij} + \tau \grad (\divg z -
+      \frac{\theta}{\lambda})_{ij}} {1+ \tau | \grad (\divg z -
+      \frac{\theta}{\lambda})_{ij}|}$
     
     \EndFor
     
@@ -633,7 +707,8 @@ uniform $5 \times 5$.
 
 
 \section{Calculating $\prox_{g}$}
-We need to calculate another proximity mapping. Recall that $H$ is a blurring operator defined by 
+We need to calculate another proximity mapping. Recall that $H$ is a
+blurring operator defined by
 \begin{align*}
   [Hu]_{ij} &= \frac{1}{(2m+1)^2}\sum_{k=-m}^{m}\sum_{l=-m}^{m} x_{i+k,j+l} \\
   &= (u * K)(i,j), \\ 
